@@ -1,11 +1,14 @@
 """
 Authentication and authorization dependencies.
 """
+
 from typing import Optional
+
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.database import get_db
 from app.core.security import decode_token, verify_token_type
 from app.models import User
@@ -21,29 +24,29 @@ async def get_current_user(
     token = credentials.credentials
     payload = decode_token(token)
     verify_token_type(payload, "access")
-    
+
     user_id = payload.get("sub")
     if user_id is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
         )
-    
+
     result = await db.execute(select(User).where(User.id == int(user_id)))
     user = result.scalar_one_or_none()
-    
+
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
-    
+
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inactive user",
         )
-    
+
     return user
 
 
@@ -73,11 +76,11 @@ async def get_current_superuser(
 
 class RBACChecker:
     """Check if user has permission for a resource and action."""
-    
+
     def __init__(self, resource: str, action: str):
         self.resource = resource
         self.action = action
-    
+
     async def __call__(
         self,
         current_user: User = Depends(get_current_user),
@@ -87,14 +90,13 @@ class RBACChecker:
         # Superusers have all permissions
         if current_user.is_superuser:
             return current_user
-        
+
         # Check user's roles and permissions
         for role in current_user.roles:
             for permission in role.permissions:
-                if (permission.resource == self.resource and 
-                    permission.action == self.action):
+                if permission.resource == self.resource and permission.action == self.action:
                     return current_user
-        
+
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Not enough permissions to {self.action} {self.resource}",

@@ -1,15 +1,18 @@
 """
 Main FastAPI application.
 """
+
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from contextlib import asynccontextmanager
 from prometheus_client import make_asgi_app
+
+from app.api import admin, agents, audit_logs, auth, pipelines
 from app.core.config import get_settings
-from app.core.database import init_db, close_db
+from app.core.database import close_db, init_db
 from app.services.event_bus import event_bus
-from app.api import auth, agents, pipelines, audit_logs, admin
 
 settings = get_settings()
 
@@ -89,6 +92,7 @@ async def readiness_check():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
