@@ -1,15 +1,18 @@
 """
 Audit log endpoints.
 """
-from typing import List, Optional
+
 from datetime import datetime
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import RBACChecker, get_current_user
 from app.core.database import get_db
 from app.models import AuditLog, User
-from app.api.deps import get_current_user, RBACChecker
 
 router = APIRouter()
 
@@ -25,7 +28,7 @@ class AuditLogResponse(BaseModel):
     user_agent: Optional[str]
     status: str
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -43,7 +46,7 @@ async def list_audit_logs(
 ):
     """List audit logs with optional filters."""
     query = select(AuditLog)
-    
+
     # Apply filters
     if action:
         query = query.where(AuditLog.action == action)
@@ -53,13 +56,13 @@ async def list_audit_logs(
         query = query.where(AuditLog.user_id == user_id)
     if status:
         query = query.where(AuditLog.status == status)
-    
+
     # Order by creation date descending
     query = query.order_by(AuditLog.created_at.desc())
-    
+
     # Apply pagination
     query = query.offset(skip).limit(limit)
-    
+
     result = await db.execute(query)
     logs = result.scalars().all()
     return logs
@@ -74,14 +77,15 @@ async def get_audit_log(
     """Get a specific audit log entry."""
     result = await db.execute(select(AuditLog).where(AuditLog.id == log_id))
     log = result.scalar_one_or_none()
-    
+
     if not log:
         from fastapi import HTTPException, status
+
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Audit log not found",
         )
-    
+
     return log
 
 
@@ -92,6 +96,7 @@ async def list_actions(
 ):
     """List all unique actions recorded in audit logs."""
     from sqlalchemy import distinct
+
     result = await db.execute(select(distinct(AuditLog.action)))
     actions = [row[0] for row in result.all()]
     return {"actions": actions}
@@ -104,6 +109,7 @@ async def list_resource_types(
 ):
     """List all unique resource types recorded in audit logs."""
     from sqlalchemy import distinct
+
     result = await db.execute(select(distinct(AuditLog.resource_type)))
     resource_types = [row[0] for row in result.all()]
     return {"resource_types": resource_types}

@@ -1,18 +1,21 @@
 """
 Audit logging service.
 """
-from typing import Optional, Dict, Any
+
 from datetime import datetime
+from typing import Any, Dict, Optional
+
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models import AuditLog
+
 from app.core.config import get_settings
+from app.models import AuditLog
 
 settings = get_settings()
 
 
 class AuditLogger:
     """Service for recording audit logs."""
-    
+
     @staticmethod
     async def log(
         db: AsyncSession,
@@ -28,7 +31,7 @@ class AuditLogger:
         """Create an audit log entry."""
         if not settings.enable_audit_log:
             return None
-        
+
         audit_log = AuditLog(
             user_id=user_id,
             action=action,
@@ -39,13 +42,13 @@ class AuditLogger:
             user_agent=user_agent,
             status=status,
         )
-        
+
         db.add(audit_log)
         await db.commit()
         await db.refresh(audit_log)
-        
+
         return audit_log
-    
+
     @staticmethod
     async def log_login(
         db: AsyncSession,
@@ -64,7 +67,7 @@ class AuditLogger:
             user_agent=user_agent,
             status="success" if success else "failure",
         )
-    
+
     @staticmethod
     async def log_logout(
         db: AsyncSession,
@@ -81,7 +84,7 @@ class AuditLogger:
             ip_address=ip_address,
             user_agent=user_agent,
         )
-    
+
     @staticmethod
     async def log_create(
         db: AsyncSession,
@@ -103,7 +106,7 @@ class AuditLogger:
             ip_address=ip_address,
             user_agent=user_agent,
         )
-    
+
     @staticmethod
     async def log_update(
         db: AsyncSession,
@@ -125,7 +128,7 @@ class AuditLogger:
             ip_address=ip_address,
             user_agent=user_agent,
         )
-    
+
     @staticmethod
     async def log_delete(
         db: AsyncSession,
