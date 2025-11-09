@@ -1,16 +1,19 @@
 """
 Agent management endpoints.
 """
+
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
-from app.core.database import get_db
-from app.models import Agent, AgentType, AgentStatus, User
-from app.api.deps import get_current_user, RBACChecker
-from app.services.audit import AuditLogger
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.agents.registry import agent_registry
+from app.api.deps import RBACChecker, get_current_user
+from app.core.database import get_db
+from app.models import Agent, AgentStatus, AgentType, User
+from app.services.audit import AuditLogger
 
 router = APIRouter()
 
@@ -39,7 +42,7 @@ class AgentResponse(BaseModel):
     config: dict
     version: str
     is_plugin: bool
-    
+
     class Config:
         from_attributes = True
 
@@ -72,7 +75,7 @@ async def create_agent(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Agent with this name already exists",
         )
-    
+
     # Create agent
     agent = Agent(
         name=agent_data.name,
@@ -82,11 +85,11 @@ async def create_agent(
         version=agent_data.version,
         status=AgentStatus.INACTIVE,
     )
-    
+
     db.add(agent)
     await db.commit()
     await db.refresh(agent)
-    
+
     # Audit log
     await AuditLogger.log_create(
         db=db,
@@ -97,7 +100,7 @@ async def create_agent(
         ip_address=request.client.host,
         user_agent=request.headers.get("user-agent"),
     )
-    
+
     return agent
 
 
@@ -110,13 +113,13 @@ async def get_agent(
     """Get an agent by ID."""
     result = await db.execute(select(Agent).where(Agent.id == agent_id))
     agent = result.scalar_one_or_none()
-    
+
     if not agent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Agent not found",
         )
-    
+
     return agent
 
 
@@ -131,21 +134,21 @@ async def update_agent(
     """Update an agent."""
     result = await db.execute(select(Agent).where(Agent.id == agent_id))
     agent = result.scalar_one_or_none()
-    
+
     if not agent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Agent not found",
         )
-    
+
     # Update fields
     update_data = agent_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(agent, field, value)
-    
+
     await db.commit()
     await db.refresh(agent)
-    
+
     # Audit log
     await AuditLogger.log_update(
         db=db,
@@ -156,7 +159,7 @@ async def update_agent(
         ip_address=request.client.host,
         user_agent=request.headers.get("user-agent"),
     )
-    
+
     return agent
 
 
@@ -170,13 +173,13 @@ async def delete_agent(
     """Delete an agent."""
     result = await db.execute(select(Agent).where(Agent.id == agent_id))
     agent = result.scalar_one_or_none()
-    
+
     if not agent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Agent not found",
         )
-    
+
     # Audit log before deletion
     await AuditLogger.log_delete(
         db=db,
@@ -187,10 +190,10 @@ async def delete_agent(
         ip_address=request.client.host,
         user_agent=request.headers.get("user-agent"),
     )
-    
+
     await db.delete(agent)
     await db.commit()
-    
+
     return None
 
 
@@ -204,17 +207,17 @@ async def activate_agent(
     """Activate an agent."""
     result = await db.execute(select(Agent).where(Agent.id == agent_id))
     agent = result.scalar_one_or_none()
-    
+
     if not agent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Agent not found",
         )
-    
+
     agent.status = AgentStatus.ACTIVE
     await db.commit()
     await db.refresh(agent)
-    
+
     # Audit log
     await AuditLogger.log_update(
         db=db,
@@ -225,7 +228,7 @@ async def activate_agent(
         ip_address=request.client.host,
         user_agent=request.headers.get("user-agent"),
     )
-    
+
     return agent
 
 
@@ -239,17 +242,17 @@ async def deactivate_agent(
     """Deactivate an agent."""
     result = await db.execute(select(Agent).where(Agent.id == agent_id))
     agent = result.scalar_one_or_none()
-    
+
     if not agent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Agent not found",
         )
-    
+
     agent.status = AgentStatus.INACTIVE
     await db.commit()
     await db.refresh(agent)
-    
+
     # Audit log
     await AuditLogger.log_update(
         db=db,
@@ -260,7 +263,7 @@ async def deactivate_agent(
         ip_address=request.client.host,
         user_agent=request.headers.get("user-agent"),
     )
-    
+
     return agent
 
 

@@ -1,16 +1,19 @@
 """
 Admin endpoints for user, role, and permission management.
 """
+
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr
-from app.core.database import get_db
-from app.models import User, Role, Permission
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from app.api.deps import get_current_superuser
+from app.core.database import get_db
 from app.core.security import get_password_hash
+from app.models import Permission, Role, User
 from app.services.audit import AuditLogger
 
 router = APIRouter()
@@ -40,7 +43,7 @@ class UserResponse(BaseModel):
     full_name: Optional[str]
     is_active: bool
     is_superuser: bool
-    
+
     class Config:
         from_attributes = True
 
@@ -59,7 +62,7 @@ class RoleResponse(BaseModel):
     id: int
     name: str
     description: Optional[str]
-    
+
     class Config:
         from_attributes = True
 
@@ -74,7 +77,7 @@ class PermissionResponse(BaseModel):
     role_id: int
     resource: str
     action: str
-    
+
     class Config:
         from_attributes = True
 
@@ -112,7 +115,7 @@ async def create_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already exists",
         )
-    
+
     # Check if email exists
     result = await db.execute(select(User).where(User.email == user_data.email))
     if result.scalar_one_or_none():
@@ -120,7 +123,7 @@ async def create_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already exists",
         )
-    
+
     # Create user
     user = User(
         username=user_data.username,
@@ -130,11 +133,11 @@ async def create_user(
         is_active=user_data.is_active,
         is_superuser=user_data.is_superuser,
     )
-    
+
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    
+
     # Audit log
     await AuditLogger.log_create(
         db=db,
@@ -145,7 +148,7 @@ async def create_user(
         ip_address=request.client.host,
         user_agent=request.headers.get("user-agent"),
     )
-    
+
     return user
 
 
@@ -160,21 +163,21 @@ async def update_user(
     """Update a user (superuser only)."""
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
-    
+
     # Update fields
     update_data = user_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(user, field, value)
-    
+
     await db.commit()
     await db.refresh(user)
-    
+
     # Audit log
     await AuditLogger.log_update(
         db=db,
@@ -185,7 +188,7 @@ async def update_user(
         ip_address=request.client.host,
         user_agent=request.headers.get("user-agent"),
     )
-    
+
     return user
 
 
@@ -208,7 +211,7 @@ async def assign_role_to_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
-    
+
     # Get role
     result = await db.execute(select(Role).where(Role.id == role_request.role_id))
     role = result.scalar_one_or_none()
@@ -217,13 +220,13 @@ async def assign_role_to_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Role not found",
         )
-    
+
     # Assign role
     if role not in user.roles:
         user.roles.append(role)
         await db.commit()
         await db.refresh(user)
-    
+
     # Audit log
     await AuditLogger.log(
         db=db,
@@ -235,7 +238,7 @@ async def assign_role_to_user(
         ip_address=request.client.host,
         user_agent=request.headers.get("user-agent"),
     )
-    
+
     return user
 
 
@@ -268,16 +271,16 @@ async def create_role(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Role already exists",
         )
-    
+
     role = Role(
         name=role_data.name,
         description=role_data.description,
     )
-    
+
     db.add(role)
     await db.commit()
     await db.refresh(role)
-    
+
     # Audit log
     await AuditLogger.log_create(
         db=db,
@@ -288,11 +291,15 @@ async def create_role(
         ip_address=request.client.host,
         user_agent=request.headers.get("user-agent"),
     )
-    
+
     return role
 
 
-@router.post("/roles/{role_id}/permissions", response_model=PermissionResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/roles/{role_id}/permissions",
+    response_model=PermissionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def add_permission_to_role(
     role_id: int,
     permission_data: PermissionCreate,
@@ -309,18 +316,18 @@ async def add_permission_to_role(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Role not found",
         )
-    
+
     # Create permission
     permission = Permission(
         role_id=role_id,
         resource=permission_data.resource,
         action=permission_data.action,
     )
-    
+
     db.add(permission)
     await db.commit()
     await db.refresh(permission)
-    
+
     # Audit log
     await AuditLogger.log_create(
         db=db,
@@ -331,7 +338,7 @@ async def add_permission_to_role(
         ip_address=request.client.host,
         user_agent=request.headers.get("user-agent"),
     )
-    
+
     return permission
 
 
