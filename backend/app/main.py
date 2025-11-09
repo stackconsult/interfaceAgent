@@ -9,7 +9,7 @@ from prometheus_client import make_asgi_app
 from app.core.config import get_settings
 from app.core.database import init_db, close_db
 from app.services.event_bus import event_bus
-from app.api import auth, agents, pipelines
+from app.api import auth, agents, pipelines, audit_logs, admin
 
 settings = get_settings()
 
@@ -49,6 +49,8 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(agents.router, prefix="/api/agents", tags=["Agents"])
 app.include_router(pipelines.router, prefix="/api/pipelines", tags=["Pipelines"])
+app.include_router(audit_logs.router, prefix="/api/audit-logs", tags=["Audit Logs"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 
 # Mount Prometheus metrics
 if settings.enable_metrics:
