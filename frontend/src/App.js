@@ -7,6 +7,10 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Agents from './components/Agents';
+import Pipelines from './components/Pipelines';
+import Monitoring from './components/Monitoring';
+import AuditLogs from './components/AuditLogs';
+import Admin from './components/Admin';
 import './index.css';
 
 const PrivateRoute = ({ children }) => {
@@ -45,7 +49,7 @@ function App() {
             path="/pipelines"
             element={
               <PrivateRoute>
-                <div className="container"><h1>Pipelines (Coming Soon)</h1></div>
+                <Pipelines />
               </PrivateRoute>
             }
           />
@@ -53,7 +57,7 @@ function App() {
             path="/monitoring"
             element={
               <PrivateRoute>
-                <div className="container"><h1>Monitoring (Coming Soon)</h1></div>
+                <Monitoring />
               </PrivateRoute>
             }
           />
@@ -61,7 +65,7 @@ function App() {
             path="/audit-logs"
             element={
               <PrivateRoute>
-                <div className="container"><h1>Audit Logs (Coming Soon)</h1></div>
+                <AuditLogs />
               </PrivateRoute>
             }
           />
@@ -77,7 +81,7 @@ function App() {
             path="/admin"
             element={
               <PrivateRoute>
-                <div className="container"><h1>Admin (Coming Soon)</h1></div>
+                <Admin />
               </PrivateRoute>
             }
           />
