@@ -1,17 +1,28 @@
 """
 Pipeline management endpoints.
 """
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
-from pydantic import BaseModel
-from app.core.database import get_db
-from app.models import Pipeline, PipelineStep, PipelineExecution, Agent, User, PipelineStatus, ExecutionStatus
-from app.api.deps import get_current_user, RBACChecker
-from app.services.audit import AuditLogger
+
 from datetime import datetime
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.api.deps import RBACChecker, get_current_user
+from app.core.database import get_db
+from app.models import (
+    Agent,
+    ExecutionStatus,
+    Pipeline,
+    PipelineExecution,
+    PipelineStatus,
+    PipelineStep,
+    User,
+)
+from app.services.audit import AuditLogger
 
 router = APIRouter()
 
@@ -40,7 +51,7 @@ class PipelineStepResponse(BaseModel):
     agent_id: int
     order: int
     config: dict
-    
+
     class Config:
         from_attributes = True
 
@@ -52,7 +63,7 @@ class PipelineResponse(BaseModel):
     status: PipelineStatus
     config: dict
     steps: List[PipelineStepResponse] = []
-    
+
     class Config:
         from_attributes = True
 
@@ -70,7 +81,7 @@ class PipelineExecutionResponse(BaseModel):
     error_message: Optional[str]
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
-    
+
     class Config:
         from_attributes = True
 
@@ -84,10 +95,7 @@ async def list_pipelines(
 ):
     """List all pipelines."""
     result = await db.execute(
-        select(Pipeline)
-        .options(selectinload(Pipeline.steps))
-        .offset(skip)
-        .limit(limit)
+        select(Pipeline).options(selectinload(Pipeline.steps)).offset(skip).limit(limit)
     )
     pipelines = result.scalars().all()
     return pipelines
@@ -108,7 +116,7 @@ async def create_pipeline(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Pipeline with this name already exists",
         )
-    
+
     # Create pipeline
     pipeline = Pipeline(
         name=pipeline_data.name,
@@ -116,11 +124,11 @@ async def create_pipeline(
         config=pipeline_data.config,
         status=PipelineStatus.DRAFT,
     )
-    
+
     db.add(pipeline)
     await db.commit()
     await db.refresh(pipeline)
-    
+
     # Audit log
     await AuditLogger.log_create(
         db=db,
@@ -131,7 +139,7 @@ async def create_pipeline(
         ip_address=request.client.host,
         user_agent=request.headers.get("user-agent"),
     )
-    
+
     return pipeline
 
 
@@ -143,18 +151,16 @@ async def get_pipeline(
 ):
     """Get a pipeline by ID."""
     result = await db.execute(
-        select(Pipeline)
-        .options(selectinload(Pipeline.steps))
-        .where(Pipeline.id == pipeline_id)
+        select(Pipeline).options(selectinload(Pipeline.steps)).where(Pipeline.id == pipeline_id)
     )
     pipeline = result.scalar_one_or_none()
-    
+
     if not pipeline:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Pipeline not found",
         )
-    
+
     return pipeline
 
 
@@ -169,21 +175,21 @@ async def update_pipeline(
     """Update a pipeline."""
     result = await db.execute(select(Pipeline).where(Pipeline.id == pipeline_id))
     pipeline = result.scalar_one_or_none()
-    
+
     if not pipeline:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Pipeline not found",
         )
-    
+
     # Update fields
     update_data = pipeline_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(pipeline, field, value)
-    
+
     await db.commit()
     await db.refresh(pipeline)
-    
+
     # Audit log
     await AuditLogger.log_update(
         db=db,
@@ -194,7 +200,7 @@ async def update_pipeline(
         ip_address=request.client.host,
         user_agent=request.headers.get("user-agent"),
     )
-    
+
     return pipeline
 
 
@@ -208,13 +214,13 @@ async def delete_pipeline(
     """Delete a pipeline."""
     result = await db.execute(select(Pipeline).where(Pipeline.id == pipeline_id))
     pipeline = result.scalar_one_or_none()
-    
+
     if not pipeline:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Pipeline not found",
         )
-    
+
     # Audit log before deletion
     await AuditLogger.log_delete(
         db=db,
@@ -225,14 +231,16 @@ async def delete_pipeline(
         ip_address=request.client.host,
         user_agent=request.headers.get("user-agent"),
     )
-    
+
     await db.delete(pipeline)
     await db.commit()
-    
+
     return None
 
 
-@router.post("/{pipeline_id}/steps", response_model=PipelineStepResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{pipeline_id}/steps", response_model=PipelineStepResponse, status_code=status.HTTP_201_CREATED
+)
 async def add_pipeline_step(
     pipeline_id: int,
     step_data: PipelineStepCreate,
@@ -249,7 +257,7 @@ async def add_pipeline_step(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Pipeline not found",
         )
-    
+
     # Verify agent exists
     result = await db.execute(select(Agent).where(Agent.id == step_data.agent_id))
     agent = result.scalar_one_or_none()
@@ -258,7 +266,7 @@ async def add_pipeline_step(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Agent not found",
         )
-    
+
     # Create step
     step = PipelineStep(
         pipeline_id=pipeline_id,
@@ -266,11 +274,11 @@ async def add_pipeline_step(
         order=step_data.order,
         config=step_data.config,
     )
-    
+
     db.add(step)
     await db.commit()
     await db.refresh(step)
-    
+
     return step
 
 
@@ -285,24 +293,22 @@ async def execute_pipeline(
     """Execute a pipeline."""
     # Get pipeline with steps
     result = await db.execute(
-        select(Pipeline)
-        .options(selectinload(Pipeline.steps))
-        .where(Pipeline.id == pipeline_id)
+        select(Pipeline).options(selectinload(Pipeline.steps)).where(Pipeline.id == pipeline_id)
     )
     pipeline = result.scalar_one_or_none()
-    
+
     if not pipeline:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Pipeline not found",
         )
-    
+
     if pipeline.status != PipelineStatus.ACTIVE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Pipeline is not active",
         )
-    
+
     # Create execution record
     execution = PipelineExecution(
         pipeline_id=pipeline_id,
@@ -310,14 +316,14 @@ async def execute_pipeline(
         input_data=execution_data.input_data,
         started_at=datetime.utcnow(),
     )
-    
+
     db.add(execution)
     await db.commit()
     await db.refresh(execution)
-    
+
     # TODO: Execute pipeline steps asynchronously via Celery
     # For now, we'll just mark it as pending
-    
+
     # Audit log
     await AuditLogger.log(
         db=db,
@@ -329,7 +335,7 @@ async def execute_pipeline(
         ip_address=request.client.host,
         user_agent=request.headers.get("user-agent"),
     )
-    
+
     return execution
 
 
