@@ -80,4 +80,39 @@ export const agentsAPI = {
   listAvailable: () => api.get('/api/agents/registry/list'),
 };
 
+// Pipelines API
+export const pipelinesAPI = {
+  list: (params) => api.get('/api/pipelines/', { params }),
+  get: (id) => api.get(`/api/pipelines/${id}`),
+  create: (data) => api.post('/api/pipelines/', data),
+  update: (id, data) => api.put(`/api/pipelines/${id}`, data),
+  delete: (id) => api.delete(`/api/pipelines/${id}`),
+  addStep: (id, stepData) => api.post(`/api/pipelines/${id}/steps`, stepData),
+  execute: (id, inputData) => api.post(`/api/pipelines/${id}/execute`, inputData),
+  listExecutions: (id, params) => api.get(`/api/pipelines/${id}/executions`, { params }),
+};
+
+// Audit Logs API
+export const auditLogsAPI = {
+  list: (params) => api.get('/api/audit-logs/', { params }),
+  get: (id) => api.get(`/api/audit-logs/${id}`),
+  listActions: () => api.get('/api/audit-logs/actions/list'),
+  listResourceTypes: () => api.get('/api/audit-logs/resource-types/list'),
+};
+
+// Admin API
+export const adminAPI = {
+  // Users
+  listUsers: (params) => api.get('/api/admin/users/', { params }),
+  createUser: (userData) => api.post('/api/admin/users/', userData),
+  updateUser: (id, userData) => api.put(`/api/admin/users/${id}`, userData),
+  assignRole: (userId, roleData) => api.post(`/api/admin/users/${userId}/roles`, roleData),
+  
+  // Roles
+  listRoles: (params) => api.get('/api/admin/roles/', { params }),
+  createRole: (roleData) => api.post('/api/admin/roles/', roleData),
+  listRolePermissions: (roleId) => api.get(`/api/admin/roles/${roleId}/permissions`),
+  addPermission: (roleId, permissionData) => api.post(`/api/admin/roles/${roleId}/permissions`, permissionData),
+};
+
 export default api;
