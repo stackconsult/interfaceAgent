@@ -3,7 +3,6 @@ Plugin system for loading custom agents.
 """
 
 import importlib
-from pathlib import Path
 from typing import Any, Dict, Optional
 
 from app.agents.base_agent import BaseAgent
