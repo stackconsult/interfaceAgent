@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import RBACChecker, get_current_user
+from app.api.deps import RBACChecker
 from app.core.database import get_db
 from app.models import AuditLog, User
 
